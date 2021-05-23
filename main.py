@@ -6,7 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
 from flask_login import UserMixin, login_user, LoginManager, login_required, current_user, logout_user
-from forms import CreatePostForm
+from forms import CreatePostForm, RegisterForm
 from flask_gravatar import Gravatar
 import os
 
@@ -39,6 +39,14 @@ class BlogPost(db.Model):
     img_url = db.Column(db.String(250), nullable=False)
 
 
+class User(db.Model):
+    __tablename__ = "users"
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    password = db.Column(db.String(1000), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+
+
 # Create the database file and tables
 if not os.path.isfile(DB_URL):
     db.create_all()
@@ -50,9 +58,23 @@ def get_all_posts():
     return render_template("index.html", all_posts=posts)
 
 
-@app.route('/register')
+@app.route('/register', methods=['GET', 'POST'])
 def register():
-    return render_template("register.html")
+    form = RegisterForm()
+    if form.validate_on_submit():
+        user = User(
+            email=form.email.data,
+            name=form.name.data,
+            password=generate_password_hash(
+                form.password.data,
+                method='pbkdf2:sha3_512:100000',
+                salt_length=32
+            )
+        )
+        db.session.add(user)
+        db.session.commit()
+        return redirect(url_for('get_all_posts'))
+    return render_template("register.html", form=form)
 
 
 @app.route('/login')
@@ -130,4 +152,4 @@ def delete_post(post_id):
 
 
 if __name__ == "__main__":
-    app.run(host='127.0.0.1', port=5009)
+    app.run(host='127.0.0.1', port=5009, debug=True)
