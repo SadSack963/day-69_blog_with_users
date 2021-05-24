@@ -50,3 +50,20 @@ class RegisterForm(FlaskForm):
         label="Sign Me Up",
         render_kw={'btn-primary': 'True'}
     )
+
+
+class LoginForm(FlaskForm):
+    email = StringField(
+        label="Email",
+        validators=[DataRequired(), Email(check_deliverability=True)],
+        render_kw={'style': 'width: 60ch'},
+    )
+    password = PasswordField(
+        label="Password",
+        validators=[DataRequired(), Length(min=6)],
+        render_kw={'style': 'width: 60ch'},
+    )
+    submit = SubmitField(
+        label="Log In",
+        render_kw={'btn-primary': 'True'}
+    )

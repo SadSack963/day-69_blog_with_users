@@ -1,12 +1,13 @@
-from flask import Flask, render_template, redirect, url_for, flash
+from flask import Flask, render_template, redirect, url_for, flash, request
 from flask_bootstrap import Bootstrap
 from flask_ckeditor import CKEditor
 from datetime import date
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
+from sqlalchemy import orm
 from flask_login import UserMixin, login_user, LoginManager, login_required, current_user, logout_user
-from forms import CreatePostForm, RegisterForm
+from forms import CreatePostForm, RegisterForm, LoginForm
 from flask_gravatar import Gravatar
 import os
 
@@ -25,6 +26,19 @@ app.config['SQLALCHEMY_DATABASE_URI'] = DB_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
+# Flask-Login
+# https://flask-login.readthedocs.io/en/latest/
+# YouTube video: https://www.youtube.com/watch?v=2dEM-s3mRLE
+# Example: https://gist.github.com/bkdinoop/6698956
+login_manager = LoginManager()  # Instantiate the Flask Login extension
+
+# # Specify the default login URL in the Flask-Login
+# login_manager.login_view = 'login'
+# login_manager.login_message = u"Please log in to access this page."
+# login_manager.setup_app(app)
+
+login_manager.init_app(app)  # Initialise the manager passing the app to it
+
 
 # CONFIGURE TABLES
 
@@ -39,7 +53,7 @@ class BlogPost(db.Model):
     img_url = db.Column(db.String(250), nullable=False)
 
 
-class User(db.Model):
+class User(UserMixin, db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(100), unique=True, nullable=False)
@@ -52,6 +66,26 @@ if not os.path.isfile(DB_URL):
     db.create_all()
 
 
+@login_manager.user_loader
+def load_user(user_id):
+    """
+    This callback is used to reload the user object from the user ID stored in the session.
+    It connects the abstract user that Flask Login uses with the actual users in the model
+    It should take the unicode ID of a user, and return the corresponding user object.
+
+    It should return None (not raise an exception) if the ID is not valid.
+    (In that case, the ID will manually be removed from the session and processing will continue.)
+
+    :param user_id: unicode user ID
+    :return: user object
+    """
+    return User.query.get(int(user_id))
+
+
+#   =======================================
+#                  ROUTES
+#   =======================================
+
 @app.route('/')
 def get_all_posts():
     posts = BlogPost.query.all()
@@ -60,30 +94,86 @@ def get_all_posts():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    form = RegisterForm()
+    form = RegisterForm()  # WTF form for the web page
     if form.validate_on_submit():
-        user = User(
-            email=form.email.data,
-            name=form.name.data,
-            password=generate_password_hash(
-                form.password.data,
-                method='pbkdf2:sha3_512:100000',
-                salt_length=32
-            )
+        # Create a new user object
+        user = User()
+        user.email = form.email.data
+        user.name = form.name.data
+
+        # Check if the email is already registered
+        if User.query.filter_by(email=user.email).first():
+            flash(f"User {user.email} already exists!", 'info')
+            flash("Log in instead.")
+            return render_template("login.html", form=LoginForm())
+        # Salt and Hash the password
+        user.password = generate_password_hash(
+            form.password.data,
+            method='pbkdf2:sha3_512:100000',
+            salt_length=32
         )
+        # Save the user in the database
         db.session.add(user)
         db.session.commit()
-        return redirect(url_for('get_all_posts'))
-    return render_template("register.html", form=form)
+        # Log the user in
+        login_user(user)
+        flash('Logged in successfully.', 'info')
+        return redirect(url_for('get_all_posts', username=user.name))
+    return render_template("register.html", form=LoginForm())
 
 
-@app.route('/login')
+@app.route('/login', methods=['GET', 'POST'])
 def login():
-    return render_template("login.html")
+    form = LoginForm()
+    if request.method == 'POST':
+        email = form.email.data
+        password = form.password.data
+        # Make sure the user exists
+        try:
+            user = User.query.filter_by(email=email).first()
+        except orm.exc.NoResultFound:
+            # SQLAlchemy.orm exception
+            flash(f"User {email} not found!", 'error')
+            flash(f"Try again.")
+            print(f"SQLAlchemy.orm exception: User {email} not found!")
+            return render_template("login.html", form=form)
+        # print(user)
+        if user:
+            # Check the the hashed password in the database against the input password
+            if check_password_hash(pwhash=user.password, password=password):
+                # Log in and authenticate the user
+                login_user(user)
+
+                # Flash Messages will show on the page that is redirected to (redirect only, not render_template)
+                # as long as the HTML is coded of course.
+                # See flash.html which is included in other html pages: {% include 'flash.html' %}
+                #   optional category: 'message', 'info', 'warning'. 'error'
+                flash('Logged in successfully.', 'info')
+
+                # Warning: You MUST validate the value of the next parameter.
+                # If you do not, your application will be vulnerable to open redirects.
+                #   Example: A logged out user enters the URL: http://127.0.0.1:5008/secrets
+                #   /secrets is protected, so the user is redirected to the login page:
+                #   http://127.0.0.1:5008/login?next=%2Fsecrets
+                #   Once the user has logged in, we redirect to where they wanted to go using the "next" attribute
+                # TODO: Handle the "next" parameter
+
+                return redirect(url_for('get_all_posts', username=user.name))
+            else:
+                flash(f'Incorrect Password for {email}', 'error')
+                flash(f"Try again.")
+                return render_template("login.html", form=form)
+        else:  # User == None
+            flash(f"User {email} not found!", 'error')
+            flash(f"Try again.")
+            return render_template("login.html", form=form)
+    return render_template("login.html", form=form)
 
 
 @app.route('/logout')
+@login_required
 def logout():
+    logout_user()
     return redirect(url_for('get_all_posts'))
 
 

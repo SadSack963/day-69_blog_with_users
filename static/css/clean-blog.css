@@ -483,3 +483,14 @@ footer .copyright {
   font-size: 16px;
   padding: 25px 35px;
 }
+
+/* Flash message categories */
+.message {
+  color: green;
+}
+.info {
+  color: cyan;
+}
+.error {
+  color: red;
+}
