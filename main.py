@@ -15,6 +15,41 @@ import os
 API_KEY = '8BYkEfBA6O6donzWlSihBXox7C0sKR6b'
 DB_URL = 'sqlite:///database/blog.db'
 
+"""
+    DEFAULT FLASK APP CONFIGURATION
+    ===============================
+    default_config = {
+        'APPLICATION_ROOT': '/',
+        'DEBUG': None,
+        'ENV': None,
+        'EXPLAIN_TEMPLATE_LOADING': False,
+        'JSONIFY_MIMETYPE': 'application/json',
+        'JSONIFY_PRETTYPRINT_REGULAR': False,
+        'JSON_AS_ASCII': True,
+        'JSON_SORT_KEYS': True,
+        'MAX_CONTENT_LENGTH': None,
+        'MAX_COOKIE_SIZE': 4093,
+        'PERMANENT_SESSION_LIFETIME': datetime.timedelta(days = 31),
+        'PREFERRED_URL_SCHEME': 'http',
+        'PRESERVE_CONTEXT_ON_EXCEPTION': None,
+        'PROPAGATE_EXCEPTIONS': None,
+        'SECRET_KEY': None,
+        'SEND_FILE_MAX_AGE_DEFAULT': None,
+        'SERVER_NAME': None,
+        'SESSION_COOKIE_DOMAIN': None,
+        'SESSION_COOKIE_HTTPONLY': True,
+        'SESSION_COOKIE_NAME': 'session',
+        'SESSION_COOKIE_PATH': None,
+        'SESSION_COOKIE_SAMESITE': None,
+        'SESSION_COOKIE_SECURE': False,
+        'SESSION_REFRESH_EACH_REQUEST': True,
+        'TEMPLATES_AUTO_RELOAD': None,
+        'TESTING': False,
+        'TRAP_BAD_REQUEST_ERRORS': None,
+        'TRAP_HTTP_EXCEPTIONS': False,
+        'USE_X_SENDFILE': False
+    }
+"""
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = API_KEY
@@ -89,13 +124,19 @@ def load_user(user_id):
 @app.route('/')
 def get_all_posts():
     posts = BlogPost.query.all()
-    return render_template("index.html", all_posts=posts)
+    user_id = None
+    username = request.args.get('username')
+    user = User.query.filter_by(name=username).first()
+    if user:
+        user_id = user.id
+    return render_template("index.html", all_posts=posts, id=user_id)
 
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     form = RegisterForm()  # WTF form for the web page
     if form.validate_on_submit():
+        print("registering")
         # Create a new user object
         user = User()
         user.email = form.email.data
@@ -119,7 +160,7 @@ def register():
         login_user(user)
         flash('Logged in successfully.', 'info')
         return redirect(url_for('get_all_posts', username=user.name))
-    return render_template("register.html", form=LoginForm())
+    return render_template("register.html", form=form)
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -157,6 +198,8 @@ def login():
                 #   http://127.0.0.1:5008/login?next=%2Fsecrets
                 #   Once the user has logged in, we redirect to where they wanted to go using the "next" attribute
                 # TODO: Handle the "next" parameter
+
+                print(f'Login: user.name = {user.name}')
 
                 return redirect(url_for('get_all_posts', username=user.name))
             else:
