@@ -1,4 +1,5 @@
 {% include "header.html" %}
+{% import "bootstrap/wtf.html" as wtf %}
 
   <!-- Page Header -->
   <header class="masthead" style="background-image: url('{{post.img_url}}')">
@@ -10,7 +11,7 @@
             <h1>{{post.title}}</h1>
             <h2 class="subheading">{{post.subtitle}}</h2>
             <span class="meta">Posted by
-              <a href="#">{{post.author}}</a>
+              <a href="#">{{post.author.name}}</a>
               on {{post.date}}</span>
           </div>
         </div>
@@ -49,6 +50,14 @@
               </ul>
             </div>
 
+            <!-- Add New Comment -->
+            {% if current_user.is_authenticated %}
+              <div class="container">
+                {{ ckeditor.load() }}
+                {{ ckeditor.config(name='body') }}
+                {{ wtf.quick_form(form, novalidate=True, button_map={"submit": "primary"}) }}
+              </div>
+            {% endif %}
 
           </div>
       </div>

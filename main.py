@@ -2,13 +2,11 @@ from flask import Flask, render_template, redirect, url_for, flash, request, abo
 from flask_bootstrap import Bootstrap
 from flask_ckeditor import CKEditor
 from datetime import date
-
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import relationship
-from sqlalchemy import orm
+from sqlalchemy.orm import backref, relationship, exc
 from flask_login import UserMixin, login_user, LoginManager, login_required, current_user, logout_user
-from forms import CreatePostForm, RegisterForm, LoginForm
+from forms import CreatePostForm, RegisterForm, LoginForm, CommentForm
 from flask_gravatar import Gravatar
 import os
 from functools import wraps
@@ -93,26 +91,67 @@ login_manager.init_app(app)  # Initialise the manager passing the app to it
 #              CONFIGURE TABLES
 #   =======================================
 
-class BlogPost(db.Model):
-    __tablename__ = "blog_posts"
-    id = db.Column(db.Integer, primary_key=True)
-    author = db.Column(db.String(250), nullable=False)
-    title = db.Column(db.String(250), unique=True, nullable=False)
-    subtitle = db.Column(db.String(250), nullable=False)
-    date = db.Column(db.String(250), nullable=False)
-    body = db.Column(db.Text, nullable=False)
-    img_url = db.Column(db.String(250), nullable=False)
-
-
 class User(UserMixin, db.Model):
+    # A user can have many blog posts, but a post can only belong to one user.
+    # This is a one-to-many relationship.
+    # User is the PARENT, BlogPost is the CHILD.
+    # https://docs.sqlalchemy.org/en/13/orm/basic_relationships.html
+    # https://flask-sqlalchemy.palletsprojects.com/en/2.x/models/
+    # https://www.youtube.com/watch?v=juPQ04_twtA
+
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(100), unique=True, nullable=False)
     password = db.Column(db.String(1000), nullable=False)
     name = db.Column(db.String(100), nullable=False)
 
+    # Create reference to the BlogPost class - "author" refers to the author property in the BlogPost class
+    # posts is a "psuedo column" in this "users" table
+    # posts = relationship('BlogPost', back_populates='author')  # refers to the child
+    posts = db.relationship('BlogPost', back_populates='author')  # refers to the child
 
-# Create the database file and tables
+
+class BlogPost(db.Model):
+    __tablename__ = "blog_posts"
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(250), unique=True, nullable=False)
+    subtitle = db.Column(db.String(250), nullable=False)
+    date = db.Column(db.String(250), nullable=False)
+    body = db.Column(db.Text, nullable=False)
+    img_url = db.Column(db.String(250), nullable=False)
+
+    # Create ForeignKey "users.id" - refers to the tablename of User class
+    # ForeignKey refers to the primary key in the other *table* (users)
+    # author_id is a real column in this "blog_posts" table
+    author_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    # Create reference to the User class - "posts" refers to the posts property in the User class
+    # author is a "psuedo column" in this "blog_posts" table
+    # author = relationship('User', back_populates='posts')  # refers to the parent
+    author = db.relationship('User', back_populates='posts')  # refers to the parent
+
+    # Create reference to the Comment class - "post" refers to the post property in the Comment class
+    # comments is a "psuedo column" in this "blog_post" table
+    comments = db.relationship('Comment', back_populates='post')  # refers to the child
+
+
+class Comment(db.Model):
+    __tablename__ = "comments"
+    id = db.Column(db.Integer, primary_key=True)
+    body = db.Column(db.Text, nullable=False)
+    commenter = db.Column(User, nullable=False)
+    # TODO: Will this work?
+    date = db.Column(db.String(250), nullable=False)
+    # Create ForeignKey "blog_posts.id" - refers to the tablename of BlogPost class
+    # ForeignKey refers to the primary key in the other *table* (blog_posts)
+    # post_id is a real column in this "comments" table
+    # TODO: post_id is currently null. What is wrong?
+    post_id = db.Column(db.Integer, db.ForeignKey('blog_posts.id'), nullable=False)
+    # Create reference to the BlogPost class - "comments" refers to the comments property in the BlogPost class
+    # post is a "psuedo column" in this "blog_posts" table
+    post = db.relationship('BlogPost', back_populates='comments')  # refers to the parent
+
+
+# Create the database file if it doesn't exist - also used to create / modify tables
 if not os.path.isfile(DB_URL):
     db.create_all()
 
@@ -184,7 +223,6 @@ def get_all_posts():
 def register():
     form = RegisterForm()  # WTF form for the web page
     if form.validate_on_submit():
-        print("registering")
         # Create a new user object
         user = User()
         user.email = form.email.data
@@ -204,6 +242,7 @@ def register():
         # Save the user in the database
         db.session.add(user)
         db.session.commit()
+        print(f'Registered new user: {user.name}')
         # Log the user in
         login_user(user)
         flash('Logged in successfully.', 'info')
@@ -220,7 +259,7 @@ def login():
         # Make sure the user exists
         try:
             user = User.query.filter_by(email=email).first()
-        except orm.exc.NoResultFound:
+        except exc.NoResultFound:
             # SQLAlchemy.orm exception
             flash(f"User {email} not found!", 'error')
             flash(f"Try again.")
@@ -269,10 +308,19 @@ def logout():
     return redirect(url_for('get_all_posts'))
 
 
-@app.route("/post/<int:post_id>")
+@app.route("/post/<int:post_id>", methods=['GET', 'POST'])
 def show_post(post_id):
     requested_post = BlogPost.query.get(post_id)
-    return render_template("post.html", post=requested_post)
+    form = CommentForm()
+    if form.validate_on_submit():
+        comment = Comment(
+            body=form.body.data,
+            commenter=current_user,
+            date=date.today().strftime("%B %d, %Y"),
+        )
+        db.session.add(comment)
+        db.session.commit()
+    return render_template("post.html", post=requested_post, form=form)
 
 
 @app.route("/about")
@@ -285,7 +333,7 @@ def contact():
     return render_template("contact.html")
 
 
-@app.route("/new-post")
+@app.route("/new-post", methods=['GET', 'POST'])
 @admin_only
 def add_new_post():
     form = CreatePostForm()
@@ -304,7 +352,7 @@ def add_new_post():
     return render_template("make-post.html", form=form)
 
 
-@app.route("/edit-post/<int:post_id>")
+@app.route("/edit-post/<int:post_id>", methods=['GET', 'POST'])
 @admin_only
 def edit_post(post_id):
     post = BlogPost.query.get(post_id)

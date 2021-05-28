@@ -67,3 +67,14 @@ class LoginForm(FlaskForm):
         label="Log In",
         render_kw={'btn-primary': 'True'}
     )
+
+
+class CommentForm(FlaskForm):
+    body = CKEditorField(
+        label="Your Comment",
+        validators=[DataRequired()],
+    )
+    submit = SubmitField(
+        label="Submit Comment",
+        render_kw={'btn-primary': 'True'}
+    )
