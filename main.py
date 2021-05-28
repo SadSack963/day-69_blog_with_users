@@ -1,7 +1,8 @@
-from flask import Flask, render_template, redirect, url_for, flash, request
+from flask import Flask, render_template, redirect, url_for, flash, request, abort
 from flask_bootstrap import Bootstrap
 from flask_ckeditor import CKEditor
 from datetime import date
+
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
@@ -10,10 +11,15 @@ from flask_login import UserMixin, login_user, LoginManager, login_required, cur
 from forms import CreatePostForm, RegisterForm, LoginForm
 from flask_gravatar import Gravatar
 import os
+from functools import wraps
 
 
 API_KEY = '8BYkEfBA6O6donzWlSihBXox7C0sKR6b'
 DB_URL = 'sqlite:///database/blog.db'
+
+#   =======================================
+#           CONFIGURE FLASK APP
+#   =======================================
 
 """
     DEFAULT FLASK APP CONFIGURATION
@@ -56,12 +62,20 @@ app.config['SECRET_KEY'] = API_KEY
 ckeditor = CKEditor(app)
 Bootstrap(app)
 
-# CONNECT TO DB
+
+#   =======================================
+#              CONNECT TO DB
+#   =======================================
+
 app.config['SQLALCHEMY_DATABASE_URI'] = DB_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# Flask-Login
+
+#   =======================================
+#              FLASK LOGIN
+#   =======================================
+
 # https://flask-login.readthedocs.io/en/latest/
 # YouTube video: https://www.youtube.com/watch?v=2dEM-s3mRLE
 # Example: https://gist.github.com/bkdinoop/6698956
@@ -75,7 +89,9 @@ login_manager = LoginManager()  # Instantiate the Flask Login extension
 login_manager.init_app(app)  # Initialise the manager passing the app to it
 
 
-# CONFIGURE TABLES
+#   =======================================
+#              CONFIGURE TABLES
+#   =======================================
 
 class BlogPost(db.Model):
     __tablename__ = "blog_posts"
@@ -101,6 +117,10 @@ if not os.path.isfile(DB_URL):
     db.create_all()
 
 
+#   =======================================
+#                 DECORATORS
+#   =======================================
+
 @login_manager.user_loader
 def load_user(user_id):
     """
@@ -117,6 +137,39 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 
+def admin_only(f):
+    # A decorator is a function that wraps and replaces another function.
+    # Since the original function is replaced, you need to remember to copy
+    # the original function’s information to the new function.
+    # Use functools.wraps() to handle this for you.
+    # https://flask.palletsprojects.com/en/1.1.x/patterns/viewdecorators/#login-required-decorator
+    # https://flask.palletsprojects.com/en/1.1.x/patterns/errorpages/
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # If user is not logged in or id is not 1 then return abort with 403 error
+        if not current_user.is_authenticated or current_user.id != 1:
+            return abort(403)  # Forbidden
+        # Otherwise continue with the route function
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+#   =======================================
+#               ERROR HANDLER
+#   =======================================
+
+@app.errorhandler(403)
+def forbidden(e):
+    print(e)
+    return render_template('403.html', error=e), 403
+
+
+@app.errorhandler(404)
+def forbidden(e):
+    print(e)
+    return render_template('404.html', error=e), 404
+
+
 #   =======================================
 #                  ROUTES
 #   =======================================
@@ -124,12 +177,7 @@ def load_user(user_id):
 @app.route('/')
 def get_all_posts():
     posts = BlogPost.query.all()
-    user_id = None
-    username = request.args.get('username')
-    user = User.query.filter_by(name=username).first()
-    if user:
-        user_id = user.id
-    return render_template("index.html", all_posts=posts, id=user_id)
+    return render_template("index.html", all_posts=posts)
 
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -159,7 +207,7 @@ def register():
         # Log the user in
         login_user(user)
         flash('Logged in successfully.', 'info')
-        return redirect(url_for('get_all_posts', username=user.name))
+        return redirect(url_for('get_all_posts'))
     return render_template("register.html", form=form)
 
 
@@ -201,7 +249,7 @@ def login():
 
                 print(f'Login: user.name = {user.name}')
 
-                return redirect(url_for('get_all_posts', username=user.name))
+                return redirect(url_for('get_all_posts'))
             else:
                 flash(f'Incorrect Password for {email}', 'error')
                 flash(f"Try again.")
@@ -213,6 +261,7 @@ def login():
     return render_template("login.html", form=form)
 
 
+# When applying further decorators, always remember that the route() decorator is always the outermost.
 @app.route('/logout')
 @login_required
 def logout():
@@ -237,6 +286,7 @@ def contact():
 
 
 @app.route("/new-post")
+@admin_only
 def add_new_post():
     form = CreatePostForm()
     if form.validate_on_submit():
@@ -255,6 +305,7 @@ def add_new_post():
 
 
 @app.route("/edit-post/<int:post_id>")
+@admin_only
 def edit_post(post_id):
     post = BlogPost.query.get(post_id)
     edit_form = CreatePostForm(
@@ -277,6 +328,7 @@ def edit_post(post_id):
 
 
 @app.route("/delete/<int:post_id>")
+@admin_only
 def delete_post(post_id):
     post_to_delete = BlogPost.query.get(post_id)
     db.session.delete(post_to_delete)

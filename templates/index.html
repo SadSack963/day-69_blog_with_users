@@ -36,7 +36,8 @@
           <p class="post-meta">Posted by
             <a href="#">{{post.author}}</a>
             on {{post.date}}
-            {% if id == 1 %}
+<!-- If user id is 1 then they can see the Delete button -->
+            {% if current_user.id == 1 %}
               <a href="{{url_for('delete_post', post_id=post.id) }}">✘</a>
             {% endif %}
           </p>
@@ -44,7 +45,8 @@
         <hr>
         {% endfor %}
 
-        {% if id == 1 %}
+<!-- If user id is 1 then they can see the Create Post button -->
+        {% if current_user.id == 1 %}
           <!-- New Post -->
           <div class="clearfix">
             <a class="btn btn-primary float-right" href="{{url_for('add_new_post')}}">Create New Post</a>
