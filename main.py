@@ -10,6 +10,11 @@ from forms import CreatePostForm, RegisterForm, LoginForm, CommentForm
 from flask_gravatar import Gravatar
 import os
 from functools import wraps
+# Flask Debug-toolbar
+# https://github.com/flask-debugtoolbar/flask-debugtoolbar
+# https://flask-debugtoolbar.readthedocs.io/en/latest/
+from flask import Flask
+from flask_debugtoolbar import DebugToolbarExtension
 
 API_KEY = '8BYkEfBA6O6donzWlSihBXox7C0sKR6b'
 DB_URL = 'sqlite:///database/blog.db'
@@ -59,6 +64,10 @@ app.config['SECRET_KEY'] = API_KEY
 ckeditor = CKEditor(app)
 Bootstrap(app)
 
+# Flask Debug-toolbar
+app.debug = True
+toolbar = DebugToolbarExtension(app)
+
 
 #   =======================================
 #              CONNECT TO DB
@@ -105,8 +114,14 @@ class User(UserMixin, db.Model):
     name = db.Column(db.String(100), nullable=False)
 
     # See Diagram at "docs/Class_Diagram.png"
+    # https://www.reddit.com/r/flask/comments/142gqe/trying_to_understand_relationships_in_sqlalchemy/
+    # The "posts" attribute for the User object is a list.
+    # This list defines the relationship and it can be empty or contain zero or many objects.
+    # To add a post to a user you'll define a user object, a post object and append the post object to user.posts.
+    # The back_populates allows you to get the user object from a post object (post.user).
+
     # Create reference to the BlogPost class - "author" refers to the author property in the BlogPost class
-    # posts is a "psuedo column" in this "users" table
+    # posts is a "pseudo column" in this "users" table
     # posts = relationship('BlogPost', back_populates='author')  # refers to the child
     posts = db.relationship('BlogPost', back_populates='author')  # refers to the child
     # Create reference to the Comments class - "commenter" refers to the commenter property in the Comments class
@@ -129,11 +144,11 @@ class BlogPost(db.Model):
     # author_id is a real column in this "blog_posts" table
     author_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     # Create reference to the User class - "posts" refers to the posts property in the User class
-    # author is a "psuedo column" in this "blog_posts" table
+    # author is a "pseudo column" in this "blog_posts" table
     # author = relationship('User', back_populates='posts')  # refers to the parent
     author = db.relationship('User', back_populates='posts')  # refers to the parent
     # Create reference to the Comment class - "post" refers to the post property in the Comment class
-    # comments is a "psuedo column" in this "blog_post" table
+    # comments is a "pseudo column" in this "blog_post" table
     comments = db.relationship('Comment', back_populates='post')  # refers to the child
 
 
@@ -149,14 +164,14 @@ class Comment(db.Model):
     # post_id is a real column in this "comments" table
     post_id = db.Column(db.Integer, db.ForeignKey('blog_posts.id'), nullable=False)
     # Create reference to the BlogPost class - "comments" refers to the comments property in the BlogPost class
-    # post is a "psuedo column" in this "blog_posts" table
+    # post is a "pseudo column" in this "blog_posts" table
     post = db.relationship('BlogPost', back_populates='comments')  # refers to the parent
     # Create ForeignKey "user.id" - refers to the tablename of User class
     # ForeignKey refers to the primary key in the other *table* (users)
     # commenter_id is a real column in this "comments" table
     commenter_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     # Create reference to the User class - "comments" refers to the comments property in the User class
-    # commenter is a "psuedo column" in this "comments" table
+    # commenter is a "pseudo column" in this "comments" table
     commenter = db.relationship('User', back_populates='comments')  # refers to the parent
 
 
@@ -323,13 +338,13 @@ def show_post(post_id):
     form = CommentForm()
     if form.validate_on_submit():
         print(requested_post, current_user)
-        comment = Comment(
+        new_comment = Comment(
             body=form.body.data,
             post=requested_post,
             commenter=current_user,
             date=date.today().strftime("%d/%b/%Y"),
         )
-        db.session.add(comment)
+        db.session.add(new_comment)
         db.session.commit()
     return render_template("post.html", post=requested_post, form=form)
 

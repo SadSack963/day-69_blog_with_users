@@ -38,6 +38,9 @@
 <!-- Comments Area -->
           <div class="col-lg-8 col-md-10 mx-auto comment">
               <ul class="commentList">
+                <!-- TODO: Pass a list of dictionary containing the first 10 comments.
+                         Display these comments using a for loop.
+                         Add a button to display the next 10 comments. -->
                 <li>
                     <div class="commenterImage">
                       <img src="https://pbs.twimg.com/profile_images/744849215675838464/IH0FNIXk.jpg"/>
@@ -53,8 +56,11 @@
             <!-- Add New Comment -->
             {% if current_user.is_authenticated %}
               <div class="container">
+                <!-- Load the CKEditor -->
                 {{ ckeditor.load() }}
+                <!-- Configure it with the name of the form field from CommentForm -->
                 {{ ckeditor.config(name='body') }}
+                <!-- Create the wtf quickform from CommentForm -->
                 {{ wtf.quick_form(form, novalidate=True, button_map={"submit": "primary"}) }}
               </div>
             {% endif %}
