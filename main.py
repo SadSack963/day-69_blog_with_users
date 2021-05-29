@@ -11,7 +11,6 @@ from flask_gravatar import Gravatar
 import os
 from functools import wraps
 
-
 API_KEY = '8BYkEfBA6O6donzWlSihBXox7C0sKR6b'
 DB_URL = 'sqlite:///database/blog.db'
 
@@ -105,10 +104,14 @@ class User(UserMixin, db.Model):
     password = db.Column(db.String(1000), nullable=False)
     name = db.Column(db.String(100), nullable=False)
 
+    # See Diagram at "docs/Class_Diagram.png"
     # Create reference to the BlogPost class - "author" refers to the author property in the BlogPost class
     # posts is a "psuedo column" in this "users" table
     # posts = relationship('BlogPost', back_populates='author')  # refers to the child
     posts = db.relationship('BlogPost', back_populates='author')  # refers to the child
+    # Create reference to the Comments class - "commenter" refers to the commenter property in the Comments class
+    # comments is a "psuedo column" in this "users" table
+    comments = db.relationship('Comment', back_populates='commenter')  # refers to the child
 
 
 class BlogPost(db.Model):
@@ -120,6 +123,7 @@ class BlogPost(db.Model):
     body = db.Column(db.Text, nullable=False)
     img_url = db.Column(db.String(250), nullable=False)
 
+    # See Diagram at "docs/Class_Diagram.png"
     # Create ForeignKey "users.id" - refers to the tablename of User class
     # ForeignKey refers to the primary key in the other *table* (users)
     # author_id is a real column in this "blog_posts" table
@@ -128,7 +132,6 @@ class BlogPost(db.Model):
     # author is a "psuedo column" in this "blog_posts" table
     # author = relationship('User', back_populates='posts')  # refers to the parent
     author = db.relationship('User', back_populates='posts')  # refers to the parent
-
     # Create reference to the Comment class - "post" refers to the post property in the Comment class
     # comments is a "psuedo column" in this "blog_post" table
     comments = db.relationship('Comment', back_populates='post')  # refers to the child
@@ -138,17 +141,23 @@ class Comment(db.Model):
     __tablename__ = "comments"
     id = db.Column(db.Integer, primary_key=True)
     body = db.Column(db.Text, nullable=False)
-    commenter = db.Column(User, nullable=False)
-    # TODO: Will this work?
     date = db.Column(db.String(250), nullable=False)
+
+    # See Diagram at "docs/Class_Diagram.png"
     # Create ForeignKey "blog_posts.id" - refers to the tablename of BlogPost class
     # ForeignKey refers to the primary key in the other *table* (blog_posts)
     # post_id is a real column in this "comments" table
-    # TODO: post_id is currently null. What is wrong?
     post_id = db.Column(db.Integer, db.ForeignKey('blog_posts.id'), nullable=False)
     # Create reference to the BlogPost class - "comments" refers to the comments property in the BlogPost class
     # post is a "psuedo column" in this "blog_posts" table
     post = db.relationship('BlogPost', back_populates='comments')  # refers to the parent
+    # Create ForeignKey "user.id" - refers to the tablename of User class
+    # ForeignKey refers to the primary key in the other *table* (users)
+    # commenter_id is a real column in this "comments" table
+    commenter_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    # Create reference to the User class - "comments" refers to the comments property in the User class
+    # commenter is a "psuedo column" in this "comments" table
+    commenter = db.relationship('User', back_populates='comments')  # refers to the parent
 
 
 # Create the database file if it doesn't exist - also used to create / modify tables
@@ -313,10 +322,12 @@ def show_post(post_id):
     requested_post = BlogPost.query.get(post_id)
     form = CommentForm()
     if form.validate_on_submit():
+        print(requested_post, current_user)
         comment = Comment(
             body=form.body.data,
+            post=requested_post,
             commenter=current_user,
-            date=date.today().strftime("%B %d, %Y"),
+            date=date.today().strftime("%d/%b/%Y"),
         )
         db.session.add(comment)
         db.session.commit()
@@ -344,7 +355,7 @@ def add_new_post():
             body=form.body.data,
             img_url=form.img_url.data,
             author=current_user,
-            date=date.today().strftime("%B %d, %Y")
+            date=date.today().strftime("%d/%b/%Y")
         )
         db.session.add(new_post)
         db.session.commit()
