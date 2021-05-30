@@ -95,6 +95,22 @@ login_manager.init_app(app)  # Initialise the manager passing the app to it
 
 
 #   =======================================
+#             GRAVATAR AVATARS
+#   =======================================
+
+gravatar = Gravatar(
+    app,
+    size=100,
+    rating='g',
+    default='retro',
+    force_default=False,
+    force_lower=False,
+    use_ssl=False,
+    base_url=None
+)
+
+
+#   =======================================
 #              CONFIGURE TABLES
 #   =======================================
 
@@ -342,8 +358,12 @@ def logout():
 @app.route("/post/<int:post_id>", methods=['GET', 'POST'])
 def show_post(post_id):
     requested_post = BlogPost.query.get(post_id)
+    list_comments = requested_post.comments
     form = CommentForm()
     if form.validate_on_submit():
+        if not current_user.is_authenticated:
+            flash("You cannot comment.\nYou are not logged in.", category="error")
+            return redirect(url_for("login"))
         print(requested_post, current_user)
         new_comment = Comment(
             body=form.body.data,
@@ -353,7 +373,7 @@ def show_post(post_id):
         )
         db.session.add(new_comment)
         db.session.commit()
-    return render_template("post.html", post=requested_post, form=form)
+    return render_template("post.html", post=requested_post, form=form, comments=list_comments)
 
 
 @app.route("/about")
