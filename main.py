@@ -13,7 +13,7 @@ from functools import wraps
 # Flask Debug-toolbar
 # https://github.com/flask-debugtoolbar/flask-debugtoolbar
 # https://flask-debugtoolbar.readthedocs.io/en/latest/
-from flask_debugtoolbar import DebugToolbarExtension
+# from flask_debugtoolbar import DebugToolbarExtension
 
 API_KEY = '8BYkEfBA6O6donzWlSihBXox7C0sKR6b'
 DB_URL = 'sqlite:///database/blog.db'
@@ -64,8 +64,8 @@ ckeditor = CKEditor(app)
 Bootstrap(app)
 
 # Flask Debug-toolbar
-app.debug = True
-toolbar = DebugToolbarExtension(app)
+# app.debug = True
+# toolbar = DebugToolbarExtension(app)
 
 
 #   =======================================
