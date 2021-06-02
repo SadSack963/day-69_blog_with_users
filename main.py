@@ -15,8 +15,23 @@ from functools import wraps
 # https://flask-debugtoolbar.readthedocs.io/en/latest/
 # from flask_debugtoolbar import DebugToolbarExtension
 
-API_KEY = os.environ.get("SECRET_KEY")
-DB_URL = os.environ.get("DATABASE_URL")
+# Initial setup for local development
+# API_KEY = '8BYkEfBA6O6donzWlSihBXox7C0sKR6b'
+# DB_URL = 'sqlite:///database/blog.db'
+
+if "ON_HEROKU" in os.environ:
+    # Setup for Heroku
+    API_KEY = os.environ.get("SECRET_KEY")
+    DB_URL = os.environ.get("DATABASE_URL")
+else:
+    # Load from local .env
+    from dotenv import load_dotenv
+    load_dotenv(".env")
+    API_KEY = os.environ.get("SECRET_KEY")
+    DB_URL = os.environ.get("DATABASE_URL")
+
+
+print(DB_URL)
 
 #   =======================================
 #           CONFIGURE FLASK APP
