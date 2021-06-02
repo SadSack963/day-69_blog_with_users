@@ -13,7 +13,7 @@ from functools import wraps
 # Flask Debug-toolbar
 # https://github.com/flask-debugtoolbar/flask-debugtoolbar
 # https://flask-debugtoolbar.readthedocs.io/en/latest/
-# from flask_debugtoolbar import DebugToolbarExtension
+from flask_debugtoolbar import DebugToolbarExtension
 
 # Initial setup for local development
 # API_KEY = '8BYkEfBA6O6donzWlSihBXox7C0sKR6b'
@@ -79,8 +79,8 @@ ckeditor = CKEditor(app)
 Bootstrap(app)
 
 # Flask Debug-toolbar
-# app.debug = True
-# toolbar = DebugToolbarExtension(app)
+app.debug = True
+toolbar = DebugToolbarExtension(app)
 
 
 #   =======================================
@@ -428,14 +428,14 @@ def edit_post(post_id):
         title=post.title,
         subtitle=post.subtitle,
         img_url=post.img_url,
-        author=post.author,
+        # author=post.author,
         body=post.body
     )
     if edit_form.validate_on_submit():
         post.title = edit_form.title.data
         post.subtitle = edit_form.subtitle.data
         post.img_url = edit_form.img_url.data
-        post.author = edit_form.author.data
+        # post.author = edit_form.author.data
         post.body = edit_form.body.data
         db.session.commit()
         return redirect(url_for("show_post", post_id=post.id))
