@@ -15,8 +15,8 @@ from functools import wraps
 # https://flask-debugtoolbar.readthedocs.io/en/latest/
 # from flask_debugtoolbar import DebugToolbarExtension
 
-API_KEY = '8BYkEfBA6O6donzWlSihBXox7C0sKR6b'
-DB_URL = 'sqlite:///database/blog.db'
+API_KEY = os.environ.get("SECRET_KEY")
+DB_URL = os.environ.get("DATABASE_URL")
 
 #   =======================================
 #           CONFIGURE FLASK APP
