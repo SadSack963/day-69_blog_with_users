@@ -1,25 +1,31 @@
-from flask import Flask, render_template, redirect, url_for, flash, request, abort
+import os
+import sys
+from datetime import date
+from functools import wraps
+
+from flask import (Flask, abort, flash, redirect, render_template, request,
+                   url_for)
 from flask_bootstrap import Bootstrap
 from flask_ckeditor import CKEditor
-from datetime import date
-from werkzeug.security import generate_password_hash, check_password_hash
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import backref, relationship, exc
-from flask_login import UserMixin, login_user, LoginManager, login_required, current_user, logout_user
-from forms import CreatePostForm, RegisterForm, LoginForm, CommentForm
-from flask_gravatar import Gravatar
-import os
-from functools import wraps
 # Flask Debug-toolbar
 # https://github.com/flask-debugtoolbar/flask-debugtoolbar
 # https://flask-debugtoolbar.readthedocs.io/en/latest/
 from flask_debugtoolbar import DebugToolbarExtension
+from flask_gravatar import Gravatar
+from flask_login import (LoginManager, UserMixin, current_user, login_required,
+                         login_user, logout_user)
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm import backref, exc, relationship
+from werkzeug.security import check_password_hash, generate_password_hash
+
+from forms import CommentForm, CreatePostForm, LoginForm, RegisterForm
 
 # Initial setup for local development
 # API_KEY = '8BYkEfBA6O6donzWlSihBXox7C0sKR6b'
 # DB_URL = 'sqlite:///database/blog.db'
 
 if "ON_HEROKU" in os.environ:
+    # https://python-day-69-blog-with-users.herokuapp.com/
     # Setup for Heroku
     API_KEY = os.environ.get("SECRET_KEY")
     DB_URL = os.environ.get("DATABASE_URL")
@@ -80,6 +86,9 @@ Bootstrap(app)
 
 # Flask Debug-toolbar
 app.debug = True
+# Generates ValueError: path is on mount 'c:', start on mount 'E:'
+# print(sys.path)  # This revealed that Panda3D (on the C Drive) was in the PATH
+# Uninstalling Panda3D solved the problem.
 toolbar = DebugToolbarExtension(app)
 
 
@@ -146,7 +155,7 @@ class User(UserMixin, db.Model):
     # See Diagram at "docs/Class_Diagram.png"
     # https://www.reddit.com/r/flask/comments/142gqe/trying_to_understand_relationships_in_sqlalchemy/
     # The "posts" attribute for the User object is a list.
-    # This list defines the relationship and it can be empty or contain zero or many objects.
+    # This list defines the relationship, and it can be empty or contain zero or many objects.
     # To add a post to a user you'll define a user object, a post object and append the post object to user.posts.
     # The back_populates allows you to get the user object from a post object (post.user).
     # With back_populates, both sides of the relationship are defined explicitly
@@ -156,7 +165,7 @@ class User(UserMixin, db.Model):
     # For example, you could use user.posts to retrieve the list of posts that user has created
     posts = db.relationship('BlogPost', back_populates='author')  # refers to the child
     # Create reference to the Comments class - "commenter" refers to the commenter property in the Comments class
-    # comments is a "psuedo column" in this "users" table
+    # comments is a "pseudo column" in this "users" table
     # For example, you could use user.comments to retrieve the list of comments that user has created
     comments = db.relationship('Comment', back_populates='commenter')  # refers to the child
 
@@ -199,7 +208,7 @@ class Comment(db.Model):
     # Without the ForeignKey, the relationships would not work.
     post_id = db.Column(db.Integer, db.ForeignKey('blog_posts.id'), nullable=False)
     # Create reference to the BlogPost class - "comments" refers to the comments property in the BlogPost class
-    # post is a "pseudo column" in this "blog_posts" table
+    # post is a "pseudo column" in this "comments" table
     # For example, you could use comment.post to retrieve the post associated with this comment
     post = db.relationship('BlogPost', back_populates='comments')  # refers to the parent
     # Create ForeignKey "user.id" - refers to the tablename of User class
@@ -213,9 +222,9 @@ class Comment(db.Model):
     commenter = db.relationship('User', back_populates='comments')  # refers to the parent
 
 
-# Create the database file if it doesn't exist - also used to create / modify tables
-if not os.path.isfile(DB_URL):
-    db.create_all()
+# Create the database file if it doesn't exist - also used to create *new* tables
+# if not os.path.isfile(DB_URL):
+#     db.create_all()
 
 
 #   =======================================
